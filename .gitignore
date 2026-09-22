@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment and local databases
+.env
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Node and Vite
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# IDE and OS files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ML outputs and caches
+ml-training/models/*.joblib
+ml-training/models/*.pkl
+ml-training/models/*.onnx
+ml-training/.cache/
