@@ -15,12 +15,14 @@ TrustShield AI will help users understand website trust and scam risk. Phase 1A 
 - Supporting packages: SQLAlchemy, scikit-learn, pandas, NumPy, and HTTP utilities
 - Analysis endpoint: `POST /api/scan`
 - Phase 1B: brand impersonation and lexical domain intelligence
+- Phase 2: offline-feature supervised phishing model
 
 ## Folder Structure
 
 See `PROJECT_STRUCTURE.md` for the initial layout.
 
 Phase 1B details are documented in `docs/PHASE_1B.md`.
+Phase 2 details are documented in `docs/PHASE_2_ML.md`.
 
 ## Start the Backend
 
@@ -40,6 +42,15 @@ cd backend
 .\.venv\Scripts\Activate.ps1
 pytest
 ```
+
+To retrain the Phase 2 model:
+
+```powershell
+python ml-training/scripts/prepare_dataset.py
+python ml-training/scripts/train_models.py
+```
+
+Model information is available at http://127.0.0.1:8000/api/model-info.
 
 ## Start the Frontend
 

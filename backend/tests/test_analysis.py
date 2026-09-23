@@ -4,6 +4,9 @@ from app.services.risk_engine import calculate_risk
 from app.services.domain_lexical_analyzer import analyze_lexical, shannon_entropy
 from app.services.url_analyzer import InvalidURL, analyze_url, normalize_url
 from app.utils.security import PrivateNetworkError, resolve_public_host
+from app.ml.features import ML_FEATURE_NAMES, extract_feature_vector
+from app.ml import predictor
+from app.services import domain_analyzer
 
 
 def test_normalizes_domain_without_scheme():
@@ -101,3 +104,52 @@ def test_suspicious_tld_and_path_are_structured_signals():
     _, lexical = lexical_result("https://example.xyz/login/verify/account")
     assert lexical["tld_risk_indicator"] == "caution"
     assert lexical["suspicious_path_keywords"] == ["account", "login", "verify"]
+
+
+def test_ml_feature_vector_matches_canonical_schema():
+    vector = extract_feature_vector("https://paypa1-login-security.xyz/login/verify")
+    assert len(vector) == len(ML_FEATURE_NAMES) == 29
+    assert all(isinstance(value, float) for value in vector)
+
+
+def test_official_brand_similarity_is_not_encoded_as_suspicious():
+    record, _, _ = __import__("app.ml.features", fromlist=["extract_feature_record"]).extract_feature_record("https://google.com")
+    assert record["brand_similarity_score"] == 0
+    assert record["official_brand_domain_match"] == 1
+
+
+def test_predictor_threshold_and_probability_range(monkeypatch):
+    class DummyModel:
+        n_features_in_ = len(ML_FEATURE_NAMES)
+
+        def predict_proba(self, vectors):
+            assert vectors.shape[1] == len(ML_FEATURE_NAMES)
+            return [[0.4, 0.6]]
+
+    metadata = {"features": ML_FEATURE_NAMES, "decision_threshold": 0.65, "model_version": "test"}
+    monkeypatch.setattr(predictor, "_load_artifacts", lambda: (DummyModel(), metadata, None))
+    result = predictor.predict_url("https://example.com")
+    assert result["prediction"] == "LEGITIMATE-LIKE"
+    assert 0 <= result["phishing_probability"] <= 1
+    assert 0 <= result["legitimate_probability"] <= 1
+
+
+def test_domain_rdap_fallback_calculates_lifetime(monkeypatch):
+    monkeypatch.setattr(domain_analyzer, "_lookup", lambda domain: (_ for _ in ()).throw(RuntimeError("WHOIS unavailable")))
+    monkeypatch.setattr(
+        domain_analyzer,
+        "_rdap_lookup",
+        lambda domain: {
+            "events": [
+                {"eventAction": "registration", "eventDate": "2020-01-01T00:00:00Z"},
+                {"eventAction": "expiration", "eventDate": "2030-01-01T00:00:00Z"},
+            ],
+            "nameservers": [{"ldhName": "ns1.example.test"}],
+        },
+    )
+    result = domain_analyzer.analyze_domain("example.in", timeout_seconds=0.1)
+    assert result["lookup_status"] == "available_rdap"
+    assert result["creation_date"].year == 2020
+    assert result["expiration_date"].year == 2030
+    assert result["domain_age_days"] > 2000
+    assert result["registration_remaining_days"] > 1000

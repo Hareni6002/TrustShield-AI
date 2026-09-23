@@ -37,6 +37,7 @@ SHORTENER_DOMAINS = {
     "cutt.ly",
     "shorturl.at",
 }
+TLD_EXTRACT = tldextract.TLDExtract(suffix_list_urls=None)
 
 
 class InvalidURL(ValueError):
@@ -90,7 +91,7 @@ def normalize_url(value: str) -> str:
 def extract_url_features(normalized_url: str) -> dict:
     parts = urlsplit(normalized_url)
     hostname = parts.hostname or ""
-    extracted = tldextract.extract(hostname)
+    extracted = TLD_EXTRACT(hostname)
     registered_domain = extracted.top_domain_under_public_suffix or None
     subdomain = extracted.subdomain or None
     url_text = f"{hostname}{parts.path}{parts.query}"

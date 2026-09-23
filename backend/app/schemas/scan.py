@@ -111,7 +111,77 @@ class LexicalAnalysis(BaseModel):
     lexical_risk_level: str
 
 
+class MLAnalysis(BaseModel):
+    model_available: bool
+    prediction: str
+    phishing_probability: float | None = None
+    legitimate_probability: float | None = None
+    model_version: str | None = None
+    signal_conflict: bool = False
+    conflict_message: str | None = None
+    error: str | None = None
+
+
+class ExplainabilityFactor(BaseModel):
+    feature: str
+    display_name: str
+    value: int | float
+    impact: float
+    explanation: str
+
+
+class Explainability(BaseModel):
+    available: bool
+    method: str | None = None
+    top_risk_factors: list[ExplainabilityFactor] = []
+    top_trust_factors: list[ExplainabilityFactor] = []
+    summary: list[str] = []
+    explanation_time_ms: float | None = None
+    message: str | None = None
+
+
+class ReputationAnalysis(BaseModel):
+    providers_checked: int
+    providers_available: int
+    threat_sources: int
+    external_threat_evidence_count: int
+    reputation_risk_score: int
+    reputation_level: str
+    reputation_confidence: str
+    reputation_trust_score: int | None = None
+    providers: dict[str, dict] = {}
+
+
+class AISummary(BaseModel):
+    ai_available: bool = False
+    available: bool = False
+    fallback_used: bool = True
+    summary: str
+    main_concerns: list[str] = []
+    positive_evidence: list[str] = []
+    recommended_action: str
+    sources: list[str] = []
+
+
+class AISummaryRequest(BaseModel):
+    scan_id: str = Field(min_length=1, max_length=128)
+
+
+class AIAskRequest(BaseModel):
+    scan_id: str = Field(min_length=1, max_length=128)
+    question: str = Field(min_length=3, max_length=1000)
+
+
+class AIAskResponse(BaseModel):
+    ai_available: bool = False
+    available: bool = False
+    fallback_used: bool = True
+    answer: str
+    sources: list[str] = []
+
+
 class ScanResponse(BaseModel):
+    scan_id: str
     url: str
     normalized_url: str
     technical_trust_score: int
@@ -125,5 +195,14 @@ class ScanResponse(BaseModel):
     content_analysis: HTTPAnalysis
     brand_analysis: BrandAnalysis
     lexical_analysis: LexicalAnalysis
+    ml_analysis: MLAnalysis
+    explainability: Explainability
+    reputation_analysis: ReputationAnalysis
+    trustshield_score: int
+    trustshield_risk_level: str
+    score_components: dict[str, float]
+    signal_conflict: bool = False
+    conflict_message: str | None = None
+    ai_summary: AISummary
     positive_signals: list[str]
     warning_signals: list[str]

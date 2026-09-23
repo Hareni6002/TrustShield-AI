@@ -1,101 +1,108 @@
 import { useState } from 'react'
-import axios from 'axios'
+import { AnimatePresence } from 'framer-motion'
 import './App.css'
+import Navbar from './components/Navbar'
+import IntroAnimation from './components/IntroAnimation'
+import TrustGauge from './components/TrustGauge'
+import ScoreReveal from './components/ScoreReveal'
+import PageTransition from './components/PageTransition'
+import { scanWebsite } from './services/api'
+import HomePage from './pages/HomePage'
+import ScanningPage from './pages/ScanningPage'
+import ResultOverview from './pages/ResultOverview'
+import { TechnicalPage, DomainPage, BrandPage, LexicalPage, MLPage, ExplainabilityPage, ReputationPage, AIInsightPage, AskTrustShieldPage, ContentPage, SignalsPage, RawDetailsPage } from './pages/DetailPages'
 
-const API_URL = 'http://127.0.0.1:8000'
+const MIN_SCAN_TIME = 2600
 
 function App() {
-  const [url, setUrl] = useState('https://example.com')
+  const [introVisible, setIntroVisible] = useState(() => sessionStorage.getItem('trustshield-intro-seen') !== 'true')
+  const [screen, setScreen] = useState(() => introVisible ? 'intro' : 'home')
+  const [url, setUrl] = useState('')
+  const [activeUrl, setActiveUrl] = useState('')
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
 
-  async function analyzeWebsite(event) {
-    event.preventDefault()
-    setLoading(true)
-    setError('')
+  function finishIntro() {
+    sessionStorage.setItem('trustshield-intro-seen', 'true')
+    setIntroVisible(false)
+    setScreen('home')
+  }
+
+  function resetToHome() {
+    setScreen('home')
     setResult(null)
+    setError('')
+    setActiveTab('overview')
+  }
+
+  function validateInput(value) {
+    const candidate = value.trim().includes('://') ? value.trim() : `https://${value.trim()}`
     try {
-      const response = await axios.post(`${API_URL}/api/scan`, { url })
-      setResult(response.data)
-    } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'The website could not be analyzed.')
-    } finally {
-      setLoading(false)
+      const parsed = new URL(candidate)
+      if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) return 'Enter a valid http or https URL.'
+      if (!parsed.hostname.includes('.') && !/^\d{1,3}(\.\d{1,3}){3}$/.test(parsed.hostname)) return 'Enter a complete domain, such as example.com.'
+      return ''
+    } catch {
+      return 'Enter a valid website URL.'
     }
   }
 
-  return (
-    <main className="app-shell">
-      <section className="panel">
-        <p className="eyebrow">Phase 1A · Technical Analysis</p>
-        <h1>TrustShield AI</h1>
-        <p className="intro">Analyze a public website URL using transparent technical signals.</p>
-        <form className="scan-form" onSubmit={analyzeWebsite}>
-          <label htmlFor="url">Website URL</label>
-          <div className="input-row">
-            <input id="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com" />
-            <button type="submit" disabled={loading}>{loading ? 'Analyzing…' : 'Analyze Website'}</button>
-          </div>
-        </form>
-        {error && <p className="error">{error}</p>}
-        {result && <ScanResult result={result} />}
-      </section>
-    </main>
-  )
-}
+  async function handleScan(event) {
+    event.preventDefault()
+    const validationError = validateInput(url)
+    if (validationError) { setError(validationError); return }
+    setError('')
+    setActiveUrl(url.trim())
+    setScreen('scanning')
+    const startedAt = Date.now()
+    try {
+      const [scanResult] = await Promise.all([scanWebsite(url.trim()), new Promise((resolve) => setTimeout(resolve, Math.max(0, MIN_SCAN_TIME - (Date.now() - startedAt))))])
+      setResult(scanResult)
+      setActiveTab('overview')
+      setScreen('gauge')
+    } catch (requestError) {
+      setError(requestError.response?.data?.detail || 'We could not complete the website scan.')
+      setScreen('error')
+    }
+  }
 
-function ScanResult({ result }) {
-  const { domain_analysis: domain, ssl_analysis: ssl, dns_analysis: dns, http_analysis: http, brand_analysis: brand, lexical_analysis: lexical } = result
-  return (
-    <section className="results" aria-live="polite">
-      <div className="score-row">
-        <div><span className="muted">URL</span><strong>{result.normalized_url}</strong></div>
-        <div className="score"><span className="muted">Technical Trust Score</span><strong>{result.technical_trust_score}/100</strong></div>
-      </div>
-      <p className="risk-level">{result.risk_level}</p>
-      <div className="columns">
-        <SignalList title="Positive Signals" items={result.positive_signals} empty="No positive signals recorded." />
-        <SignalList title="Warning Signals" items={result.warning_signals} empty="No warning signals recorded." warning />
-      </div>
-      <div className="intelligence-grid">
-        <section className="intelligence-card">
-          <h2>Brand Analysis</h2>
-          <Fact label="Possible Brand" value={brand.detected_brand || 'None detected'} />
-          <Fact label="Similarity" value={`${brand.brand_similarity_score}%`} />
-          <Fact label="Impersonation" value={brand.possible_brand_impersonation ? 'Possible' : 'Not detected'} />
-          <Fact label="Typosquatting" value={brand.possible_typosquatting ? 'Detected' : 'Not detected'} />
-        </section>
-        <section className="intelligence-card">
-          <h2>Lexical Risk</h2>
-          <Fact label="Score" value={`${lexical.lexical_risk_score}/100 ${lexical.lexical_risk_level}`} />
-          <Fact label="TLD" value={`${lexical.tld || 'Unavailable'} · ${lexical.tld_risk_indicator}`} />
-          <Fact label="Domain Entropy" value={lexical.domain_entropy} />
-          <Fact label="Randomness" value={`${lexical.domain_randomness_score}/100`} />
-          <Fact label="Suspicious Path" value={lexical.suspicious_path_keywords.join(', ') || 'None detected'} />
-        </section>
-      </div>
-      <dl className="facts">
-        <Fact label="Domain Age" value={domain.domain_age_days == null ? 'Unavailable' : `${domain.domain_age_days} days`} />
-        <Fact label="SSL Status" value={ssl.ssl_valid ? 'Valid' : ssl.ssl_available ? 'Available, not verified' : 'Unavailable'} />
-        <Fact label="DNS Status" value={dns.dns_resolves ? 'Resolves' : 'Unavailable'} />
-        <Fact label="Redirect Count" value={http.redirect_count} />
-        <Fact label="HTTP Status" value={http.http_status || 'Unavailable'} />
-        <Fact label="Page Title" value={http.page_title || 'Unavailable'} />
-      </dl>
-    </section>
-  )
-}
+  function openDetail(tab) {
+    setActiveTab(tab)
+  }
 
-function SignalList({ title, items, empty, warning = false }) {
-  return <div className={warning ? 'signal-list warning-list' : 'signal-list'}>
-    <h2>{title}</h2>
-    {items.length ? <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{empty}</p>}
+  function renderResults() {
+    if (activeTab === 'overview') return <ResultOverview result={result} onDetail={openDetail} onNewScan={resetToHome} />
+    const props = { result, onBack: () => setActiveTab('overview') }
+    if (activeTab === 'technical') return <TechnicalPage {...props} />
+    if (activeTab === 'domain') return <DomainPage {...props} />
+    if (activeTab === 'brand') return <BrandPage {...props} />
+    if (activeTab === 'lexical') return <LexicalPage {...props} />
+    if (activeTab === 'ml') return <MLPage {...props} />
+    if (activeTab === 'explainability') return <ExplainabilityPage {...props} />
+    if (activeTab === 'reputation') return <ReputationPage {...props} />
+    if (activeTab === 'ai-insight') return <AIInsightPage {...props} />
+    if (activeTab === 'ask') return <AskTrustShieldPage {...props} />
+    if (activeTab === 'content') return <ContentPage {...props} />
+    if (activeTab === 'positive') return <SignalsPage {...props} />
+    if (activeTab === 'warning') return <SignalsPage {...props} warning />
+    return <RawDetailsPage {...props} />
+  }
+
+  if (introVisible) return <AnimatePresence mode="wait"><IntroAnimation onComplete={finishIntro} /></AnimatePresence>
+  const resultScreen = ['results'].includes(screen)
+  return <div className="app-frame">
+    {screen !== 'scanning' && screen !== 'gauge' && screen !== 'reveal' && <Navbar active={resultScreen ? 'scan' : 'home'} onNavigate={(target) => target === 'scan' || target === 'home' ? resetToHome() : undefined} onNewScan={resetToHome} />}
+      {screen === 'results' && <div className="detail-nav">{[['overview', 'OVERVIEW'], ['technical', 'TECHNICAL'], ['domain', 'DOMAIN'], ['brand', 'BRAND & TYPOSQUATTING'], ['lexical', 'LEXICAL ANALYSIS'], ['ml', 'MACHINE LEARNING'], ['explainability', 'AI EXPLANATION'], ['reputation', 'REPUTATION'], ['ai-insight', 'AI INSIGHT'], ['ask', 'ASK TRUSTSHIELD'], ['content', 'WEBSITE CONTENT'], ['positive', 'POSITIVE SIGNALS'], ['warning', 'WARNING SIGNALS'], ['raw', 'RAW DETAILS']].map(([id, label]) => <button key={id} className={activeTab === id ? 'detail-tab active' : 'detail-tab'} onClick={() => setActiveTab(id)}>{label}</button>)}</div>}
+    <AnimatePresence mode="wait">
+      {screen === 'home' && <PageTransition key="home"><HomePage url={url} setUrl={setUrl} onSubmit={handleScan} error={error} /></PageTransition>}
+      {screen === 'scanning' && <PageTransition key="scanning"><ScanningPage url={activeUrl} /></PageTransition>}
+      {screen === 'gauge' && result && <PageTransition key="gauge"><TrustGauge score={result.trustshield_score} onComplete={() => setScreen('reveal')} /></PageTransition>}
+      {screen === 'reveal' && result && <PageTransition key="reveal"><ScoreReveal result={result} onView={() => setScreen('results')} /></PageTransition>}
+      {screen === 'results' && result && <PageTransition key={activeTab}>{renderResults()}</PageTransition>}
+      {screen === 'error' && <PageTransition key="error"><main className="error-screen"><p className="eyebrow">Scan interrupted</p><h1>Analysis Failed</h1><p>We could not complete the website scan.</p><div className="error-detail">{error}</div><div className="error-actions"><button className="primary-button" onClick={() => { setError(''); setScreen('home') }}>TRY AGAIN</button><button className="outline-button" onClick={resetToHome}>ENTER ANOTHER URL</button></div></main></PageTransition>}
+    </AnimatePresence>
   </div>
-}
-
-function Fact({ label, value }) {
-  return <div><dt>{label}</dt><dd>{value}</dd></div>
 }
 
 export default App
