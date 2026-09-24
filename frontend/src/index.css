@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -17,3 +17,7 @@ button { color: inherit; }
 code, pre, .result-url, .data-cell strong, .matrix-row strong, .gauge-center strong { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 h1, h2, .brand-mark, .intro-logo, .hero-copy h1 { font-family: 'Space Grotesk', Inter, sans-serif; }
 #root { min-height: 100vh; }
+
+
+
+

@@ -104,7 +104,13 @@ def fuse_trustshield_score(
     reputation_conflict = reputation_risk >= 45 and technical_trust_score >= 80
     signal_conflict = ml_conflict or reputation_conflict
     if reputation_conflict:
-        conflict_message = "Technical signals appear normal, but external reputation sources report threat indicators."
+        details = []
+        virustotal = reputation_analysis.get("providers", {}).get("virustotal", {})
+        if virustotal.get("status") == "threat_found":
+            details.append(f"VirusTotal reported {int(virustotal.get('malicious', 0))} malicious and {int(virustotal.get('suspicious', 0))} suspicious detections.")
+        if reputation_analysis.get("providers", {}).get("google_safe_browsing", {}).get("status") == "no_record":
+            details.append("Google Safe Browsing found no known threat match.")
+        conflict_message = "Technical signals appear normal, but external reputation sources report threat indicators. " + " ".join(details)
     elif ml_conflict:
         conflict_message = "The machine-learning model reports elevated risk while available reputation sources show no matching threat record."
     else:

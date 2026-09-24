@@ -1,9 +1,12 @@
+import os
 from urllib.parse import urlsplit
 from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException
+from fastapi import Query
+from fastapi.responses import Response
 
 from app.schemas.scan import (
     DNSAnalysis,
@@ -37,14 +40,22 @@ from app.services.reputation.aggregator import analyze_reputation, fuse_trustshi
 from app.services.ai.context_builder import build_context
 from app.services.ai.safety import deterministic_summary
 from app.services.ai.service import answer_question, generate_summary
+from app.services.ai.provider import gemini_status
 from app.services.ai.store import get_scan, save_scan
+from app.services.report_generator import build_scan_report
+from app.core.config import integration_status
+from app.db import create_report, delete_history, get_history, get_stored_scan, init_db, list_history, list_reports, moderate_report, network_for, report_summary, save_scan_history
+from app.schemas.community import CommunityReportCreate, ReportModeration
+
+
+init_db()
 
 
 app = FastAPI(title="TrustShield AI")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[origin.strip() for origin in os.getenv("FRONTEND_ORIGIN", "http://localhost:5173,http://127.0.0.1:5173").split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,6 +75,95 @@ def health() -> dict[str, str]:
 @app.get("/api/model-info")
 def get_model_info() -> dict:
     return model_info()
+
+
+@app.get("/api/integrations/status")
+def get_integrations_status() -> dict:
+    status = integration_status()
+    status["gemini"] = gemini_status()
+    return status
+
+
+@app.get("/api/history")
+def history(page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100)) -> dict:
+    items, total = list_history((page - 1) * limit, limit)
+    return {"items": items, "page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit}
+
+
+@app.get("/api/history/{history_id}")
+def history_detail(history_id: int) -> dict:
+    value = get_history(history_id)
+    if value is None:
+        raise HTTPException(status_code=404, detail="History record not found.")
+    return value
+
+
+@app.get("/api/history/{history_id}/result")
+def history_result(history_id: int) -> dict:
+    value = get_history(history_id)
+    if value is None:
+        raise HTTPException(status_code=404, detail="History record not found.")
+    scan_data = get_scan(value["scan_id"]) or get_stored_scan(value["scan_id"])
+    if scan_data is None:
+        raise HTTPException(status_code=410, detail="The full scan result is no longer available; run a new scan.")
+    return scan_data
+
+
+@app.get("/api/scans/{scan_id}/report")
+def scan_report(scan_id: str) -> Response:
+    scan_data = get_scan(scan_id) or get_stored_scan(scan_id)
+    if scan_data is None:
+        raise HTTPException(status_code=404, detail="The requested scan report is no longer available.")
+    try:
+        pdf = build_scan_report(scan_data)
+    except Exception as error:
+        raise HTTPException(status_code=500, detail="The security report could not be generated.") from error
+    domain = scan_data.get("domain_analysis", {}).get("domain_name", "scan")
+    safe_domain = "".join(character if character.isalnum() or character in {".", "-"} else "-" for character in domain)
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="trustshield-{safe_domain}.pdf"'})
+
+
+@app.delete("/api/history/{history_id}")
+def history_delete(history_id: int) -> dict[str, bool]:
+    if not delete_history(history_id):
+        raise HTTPException(status_code=404, detail="History record not found.")
+    return {"deleted": True}
+
+
+@app.post("/api/reports", status_code=201)
+def report_create(request: CommunityReportCreate) -> dict:
+    try:
+        parsed = analyze_url(request.url)
+    except InvalidURL as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    data = request.model_dump()
+    data["domain"] = parsed["registered_domain"] or parsed["hostname"]
+    return create_report(data)
+
+
+@app.get("/api/reports/domain/{domain}")
+def domain_reports(domain: str) -> dict:
+    return report_summary(domain.lower().strip().rstrip("."))
+
+
+@app.get("/api/reports")
+def reports(status: str | None = Query(None), limit: int = Query(100, ge=1, le=200)) -> dict:
+    if status and status not in {"pending", "verified", "rejected"}:
+        raise HTTPException(status_code=400, detail="Unsupported report status.")
+    return {"items": list_reports(status, limit)}
+
+
+@app.patch("/api/reports/{report_id}")
+def report_moderate(report_id: int, request: ReportModeration) -> dict:
+    value = moderate_report(report_id, request.status)
+    if value is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    return value
+
+
+@app.get("/api/network/{domain}")
+def network(domain: str) -> dict:
+    return network_for(domain.lower().strip().rstrip("."))
 
 
 @app.post("/api/ai/summary", response_model=AISummary)
@@ -192,5 +292,11 @@ def scan(request: ScanRequest) -> ScanResponse:
     )
     scan_data = scan_response.model_dump(mode="json")
     scan_response.ai_summary = AISummary(**deterministic_summary(build_context(scan_data)))
-    save_scan(scan_response.scan_id, scan_response.model_dump(mode="json"))
+    final_scan_data = scan_response.model_dump(mode="json")
+    save_scan(scan_response.scan_id, final_scan_data)
+    try:
+        save_scan_history(final_scan_data)
+    except Exception:
+        # History is supplementary; a database problem must not fail a completed scan.
+        pass
     return scan_response

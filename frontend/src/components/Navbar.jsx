@@ -1,4 +1,4 @@
-export default function Navbar({ active, onNavigate, onNewScan }) {
+﻿export default function Navbar({ active, onNavigate, onNewScan }) {
   const links = [
     { id: 'home', label: 'Home' },
     { id: 'scan', label: 'Scan' },
@@ -12,3 +12,7 @@ export default function Navbar({ active, onNavigate, onNewScan }) {
     </nav>
   </header>
 }
+
+
+
+

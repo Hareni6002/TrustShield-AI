@@ -1,41 +1,50 @@
 # TrustShield AI
 
-## Project Title
+TrustShield AI is an explainable website-risk intelligence system. It combines technical URL, DNS, SSL, domain, brand, lexical, ML, explainability and reputation evidence into a clearly labeled TrustShield score.
 
-TrustShield AI: An Explainable AI-Based Website Trust Scoring and Scam Risk Detection System
+## Features
 
-## Purpose
+- Website scan and TrustShield score
+- Technical, domain, brand, typosquatting and lexical analysis
+- ML phishing probability and top explainability factors
+- VirusTotal, Google Safe Browsing, URLhaus and Gemini integrations
+- AI summary and Ask TrustShield with deterministic fallback
+- Scan history, community reports and scam-network relationships
+- Downloadable PDF security report and safe Copy Summary action
 
-TrustShield AI will help users understand website trust and scam risk. Phase 1A now includes the initial real-time technical URL analysis engine and a simple testing page.
+## Architecture and tech stack
 
-## Current Tech Stack
+See [SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md), [TECH_STACK.md](docs/TECH_STACK.md) and [API_REFERENCE.md](docs/API_REFERENCE.md).
 
-- Backend: Python 3.13, FastAPI, Uvicorn
-- Frontend: React, Vite, JavaScript
-- Supporting packages: SQLAlchemy, scikit-learn, pandas, NumPy, and HTTP utilities
-- Analysis endpoint: `POST /api/scan`
-- Phase 1B: brand impersonation and lexical domain intelligence
-- Phase 2: offline-feature supervised phishing model
+## Setup
 
-## Folder Structure
-
-See `PROJECT_STRUCTURE.md` for the initial layout.
-
-Phase 1B details are documented in `docs/PHASE_1B.md`.
-Phase 2 details are documented in `docs/PHASE_2_ML.md`.
-
-## Start the Backend
+### Backend
 
 ```powershell
 cd backend
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Backend: http://127.0.0.1:8000  
-Swagger: http://127.0.0.1:8000/docs
+Backend: `http://127.0.0.1:8000` · Swagger: `/docs`
 
-To run the backend tests:
+### Frontend
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend: `http://127.0.0.1:5173`. Set `VITE_API_BASE_URL` for a deployed backend; localhost is only the development fallback.
+
+## Environment variables
+
+Provider keys belong only in `backend/.env`. Use `backend/.env.production.example` as a placeholder template. Never commit real keys.
+
+## Tests and ML
 
 ```powershell
 cd backend
@@ -43,20 +52,12 @@ cd backend
 pytest
 ```
 
-To retrain the Phase 2 model:
+The trained model is loaded from `backend/app/ml`. Training utilities are under `ml-training/scripts`.
 
-```powershell
-python ml-training/scripts/prepare_dataset.py
-python ml-training/scripts/train_models.py
-```
+## Security notes and limitations
 
-Model information is available at http://127.0.0.1:8000/api/model-info.
+The backend validates URLs, blocks private-network targets, keeps provider keys server-side, avoids returning reporter contact details, and uses an environment-driven CORS allow-list. SQLite is appropriate for a mini-project/demo; PostgreSQL is recommended for high-concurrency production. External provider results depend on availability, configuration and rate limits.
 
-## Start the Frontend
+## Demo
 
-```powershell
-cd frontend
-npm run dev
-```
-
-Frontend: http://127.0.0.1:5173
+Use `google.com`, `github.com` or `microsoft.com` for safe live scans. Use synthetic suspicious domains only in offline/demo mode; do not browse them live. See [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).

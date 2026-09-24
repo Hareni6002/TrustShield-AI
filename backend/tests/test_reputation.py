@@ -31,10 +31,27 @@ def test_google_parses_clean_response(monkeypatch):
 
 def test_urlhaus_parses_threat_record(monkeypatch):
     monkeypatch.setenv("URLHAUS_ENABLED", "true")
+    monkeypatch.setenv("URLHAUS_AUTH_KEY", "test-auth-key")
     monkeypatch.setattr(urlhaus.httpx, "post", lambda *args, **kwargs: FakeResponse(200, {"query_status": "ok", "url_status": "online", "threat": "malware_download", "tags": ["elf"], "date_added": "2026-01-01"}))
     result = urlhaus.lookup("https://example.com/urlhaus-test")
     assert result["status"] == "threat_found"
     assert result["threat"] == "malware_download"
+
+
+def test_urlhaus_requires_auth_key(monkeypatch):
+    monkeypatch.setenv("URLHAUS_ENABLED", "true")
+    monkeypatch.delenv("URLHAUS_AUTH_KEY", raising=False)
+    result = urlhaus.lookup("https://example.com/urlhaus-no-key")
+    assert result["status"] == "not_configured"
+    assert result["configured"] is False
+
+
+def test_urlhaus_maps_auth_failure(monkeypatch):
+    monkeypatch.setenv("URLHAUS_ENABLED", "true")
+    monkeypatch.setenv("URLHAUS_AUTH_KEY", "bad-key")
+    monkeypatch.setattr(urlhaus.httpx, "post", lambda *args, **kwargs: FakeResponse(401, {}))
+    result = urlhaus.lookup("https://example.com/urlhaus-auth-failure")
+    assert result["status"] == "authentication_failed"
 
 
 def test_aggregator_handles_partial_provider_results(monkeypatch):
@@ -65,3 +82,11 @@ def test_reputation_cache_expires(monkeypatch):
     monkeypatch.setattr(cache, "CACHE_TTL_SECONDS", 0)
     cache.set_cached("test", {"value": 1})
     assert cache.get_cached("test") is None
+
+
+def test_provider_failures_are_sanitized(monkeypatch):
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "test-key")
+    monkeypatch.setattr(virustotal.httpx, "get", lambda *args, **kwargs: FakeResponse(429, {}))
+    result = virustotal.lookup("https://example.com/rate-limit-test")
+    assert result["status"] == "rate_limited"
+    assert "test-key" not in str(result)

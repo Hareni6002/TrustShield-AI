@@ -1,4 +1,4 @@
-import { AlertTriangle, Fingerprint } from 'lucide-react'
+﻿import { AlertTriangle, Fingerprint } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export function TrustScoreRing({ score, riskLevel }) {
@@ -17,7 +17,7 @@ export function MatrixRow({ icon: Icon, label, value, detail, tone = 'red', prog
   return <motion.button className="matrix-row" onClick={onClick} whileHover={{ x: 5 }}><span className={`matrix-icon ${tone}`}><Icon size={16} strokeWidth={1.8} /></span><span className="matrix-label"><b>{label}</b><small>{detail}</small></span>{progress != null && <span className="matrix-meter"><i style={{ width: `${progress}%` }} /></span>}<strong>{value}</strong><span className="matrix-arrow">↗</span></motion.button>
 }
 
-export function SignalConflict({ signalConflict, conflictMessage, technical, phishing, onOpen }) {
+export function SignalConflict({ signalConflict, conflictMessage, technical, phishing, reputationRisk, threatSources, onOpen }) {
   if (!signalConflict) return null
   return <motion.section className="conflict-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}><div className="conflict-title"><AlertTriangle size={17} /><span>SIGNAL CONFLICT DETECTED</span></div><div className="conflict-split"><div><small>TECHNICAL EVIDENCE</small><strong>{technical}</strong><em>LOW RISK</em></div><b>VS</b><div><small>ML MODEL</small><strong>{Math.round(phishing * 100)}%</strong><em>ELEVATED RISK</em></div></div><p>Different signals are pointing in different directions. Further verification is recommended.</p><button onClick={onOpen}>VIEW ML ANALYSIS ↗</button></motion.section>
 }
@@ -44,3 +44,7 @@ export function LexicalRadar({ lexical, subdomainCount, hasPunycode }) {
   const points = values.map((value, index) => { const angle = -Math.PI / 2 + (Math.PI * 2 * index) / values.length; const radius = 84 * (value / 100); return `${120 + Math.cos(angle) * radius},${120 + Math.sin(angle) * radius}` }).join(' ')
   return <div className="lexical-visual"><svg viewBox="0 0 240 240" role="img" aria-label="Lexical signal radar"><polygon className="radar-grid" points="120,36 193,78 193,162 120,204 47,162 47,78" /><polygon className="radar-grid inner" points="120,64 169,92 169,148 120,176 71,148 71,92" /><motion.polygon className="radar-fill" points={points} initial={{ opacity: 0, scale: .5 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .8 }} /><circle cx="120" cy="120" r="4" className="radar-dot" /></svg><div className="radar-center"><span>LEXICAL RISK</span><strong>{lexical.lexical_risk_score}</strong><small>{lexical.lexical_risk_level}</small></div><div className="radar-label entropy">ENTROPY</div><div className="radar-label random">RANDOMNESS</div><div className="radar-label digits">DIGITS</div><div className="radar-label path">PATH RISK</div><div className="radar-label subs">SUBDOMAINS</div><div className="radar-label hyphen">HYPHENS</div><p className="radar-footnote">Punycode: {hasPunycode ? 'Detected' : 'Not detected'}</p></div>
 }
+
+
+
+

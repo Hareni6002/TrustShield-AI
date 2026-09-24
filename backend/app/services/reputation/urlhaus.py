@@ -11,16 +11,21 @@ from app.services.reputation.cache import get_cached, set_cached
 def lookup(url: str) -> dict[str, Any]:
     if os.getenv("URLHAUS_ENABLED", "true").strip().lower() not in {"1", "true", "yes", "on"}:
         return {"available": False, "configured": False, "provider": "URLhaus", "status": "not_configured", "url_status": None, "threat": None, "tags": [], "date_added": None, "message": "URLhaus lookups are disabled."}
+    auth_key = os.getenv("URLHAUS_AUTH_KEY", "").strip()
+    if not auth_key:
+        return {"available": False, "configured": False, "provider": "URLhaus", "status": "not_configured", "url_status": None, "threat": None, "tags": [], "date_added": None, "message": "URLhaus authentication is not configured."}
     cache_key = f"urlhaus:{url}"
     cached = get_cached(cache_key)
     if cached is not None:
         return cached
     try:
-        response = httpx.post("https://urlhaus-api.abuse.ch/v1/url/", data={"url": url}, timeout=6)
+        response = httpx.post("https://urlhaus-api.abuse.ch/v1/url/", headers={"Auth-Key": auth_key}, data={"url": url}, timeout=6)
     except httpx.TimeoutException:
         return {"available": False, "configured": True, "provider": "URLhaus", "status": "lookup_failed", "url_status": None, "threat": None, "tags": [], "date_added": None, "message": "URLhaus lookup timed out."}
     except httpx.HTTPError:
         return {"available": False, "configured": True, "provider": "URLhaus", "status": "lookup_failed", "url_status": None, "threat": None, "tags": [], "date_added": None, "message": "URLhaus is temporarily unavailable."}
+    if response.status_code in {401, 403}:
+        return {"available": False, "configured": True, "provider": "URLhaus", "status": "authentication_failed", "url_status": None, "threat": None, "tags": [], "date_added": None, "message": "URLhaus authentication was rejected."}
     if response.status_code != 200:
         return {"available": False, "configured": True, "provider": "URLhaus", "status": "lookup_failed", "url_status": None, "threat": None, "tags": [], "date_added": None, "message": "URLhaus lookup could not be completed."}
     try:

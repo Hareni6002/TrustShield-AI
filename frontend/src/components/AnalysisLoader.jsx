@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 
 const STAGES = ['Validating URL', 'Inspecting Domain', 'Checking SSL Certificate', 'Resolving DNS', 'Analyzing Redirects', 'Inspecting Website Structure', 'Detecting Brand Impersonation', 'Measuring Lexical Risk', 'Running Machine Learning Model', 'Calculating Trust Score']
@@ -19,3 +19,7 @@ export default function AnalysisLoader({ url }) {
     </div>
   </main>
 }
+
+
+
+

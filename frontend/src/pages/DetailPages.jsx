@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Activity, Code2, Globe2, LockKeyhole, Network, Server, ShieldCheck } from 'lucide-react'
 import SignalCard from '../components/SignalCard'
@@ -133,5 +133,9 @@ export function SignalsPage({ result, onBack, warning = false }) {
 }
 
 export function RawDetailsPage({ result, onBack }) {
-  return <DetailShell eyebrow="Developer details" title="Raw scan response" onBack={onBack}><div className="terminal-head"><Code2 size={16} /><span>TRUSTSHIELD // RAW TELEMETRY</span><button onClick={() => navigator.clipboard?.writeText(JSON.stringify(result, null, 2))}>COPY JSON</button></div><details className="json-details" open><summary>JSON PAYLOAD</summary><pre>{JSON.stringify(result, null, 2)}<span className="terminal-cursor">▌</span></pre></details></DetailShell>
+  return <DetailShell eyebrow="Developer details" title="Raw scan response" onBack={onBack}><div className="terminal-head"><Code2 size={16} /><span>TRUSTSHIELD // RAW TELEMETRY</span><button onClick={() => navigator.clipboard?.writeText(JSON.stringify(result, null, 2))}>COPY JSON</button></div><details className="json-details" open><summary>JSON PAYLOAD</summary><pre>{JSON.stringify(result, null, 2)}<span className="terminal-cursor">█</span></pre></details></DetailShell>
 }
+
+
+
+

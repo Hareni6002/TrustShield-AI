@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+﻿import { motion } from 'framer-motion'
 
 export default function IntroAnimation({ onComplete }) {
   return <motion.section className="intro-screen" initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.7 }} onAnimationComplete={() => setTimeout(onComplete, 2600)}>
@@ -11,3 +11,7 @@ export default function IntroAnimation({ onComplete }) {
     </div>
   </motion.section>
 }
+
+
+
+

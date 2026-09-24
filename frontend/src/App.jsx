@@ -1,7 +1,8 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import './App.css'
 import Navbar from './components/Navbar'
+import AnalysisSidebar from './components/AnalysisSidebar'
 import IntroAnimation from './components/IntroAnimation'
 import TrustGauge from './components/TrustGauge'
 import ScoreReveal from './components/ScoreReveal'
@@ -10,6 +11,10 @@ import { scanWebsite } from './services/api'
 import HomePage from './pages/HomePage'
 import ScanningPage from './pages/ScanningPage'
 import ResultOverview from './pages/ResultOverview'
+import HistoryPage from './pages/HistoryPage'
+import CommunityPage from './pages/CommunityPage'
+import NetworkPage from './pages/NetworkPage'
+import { getHistoryResult } from './services/api'
 import { TechnicalPage, DomainPage, BrandPage, LexicalPage, MLPage, ExplainabilityPage, ReputationPage, AIInsightPage, AskTrustShieldPage, ContentPage, SignalsPage, RawDetailsPage } from './pages/DetailPages'
 
 const MIN_SCAN_TIME = 2600
@@ -29,11 +34,12 @@ function App() {
     setScreen('home')
   }
 
-  function resetToHome() {
+  function resetToHome(nextUrl = '') {
     setScreen('home')
     setResult(null)
     setError('')
     setActiveTab('overview')
+    if (nextUrl) setUrl(nextUrl)
   }
 
   function validateInput(value) {
@@ -71,8 +77,33 @@ function App() {
     setActiveTab(tab)
   }
 
+  function navigateAnalysis(item) {
+    if (item === 'history' || item === 'community' || item === 'network') {
+      setScreen(item)
+      return
+    }
+    setScreen('results')
+    setActiveTab(item)
+  }
+
+  function openCommunity() {
+    setScreen('community')
+  }
+
+  async function openHistoryResult(historyId) {
+    try {
+      const scanResult = await getHistoryResult(historyId)
+      setResult(scanResult)
+      setActiveTab('overview')
+      setScreen('results')
+    } catch {
+      setError('The full scan result is no longer available. Run a new scan instead.')
+      setScreen('error')
+    }
+  }
+
   function renderResults() {
-    if (activeTab === 'overview') return <ResultOverview result={result} onDetail={openDetail} onNewScan={resetToHome} />
+    if (activeTab === 'overview') return <ResultOverview result={result} onDetail={openDetail} onNewScan={resetToHome} onCommunity={openCommunity} />
     const props = { result, onBack: () => setActiveTab('overview') }
     if (activeTab === 'technical') return <TechnicalPage {...props} />
     if (activeTab === 'domain') return <DomainPage {...props} />
@@ -91,18 +122,25 @@ function App() {
 
   if (introVisible) return <AnimatePresence mode="wait"><IntroAnimation onComplete={finishIntro} /></AnimatePresence>
   const resultScreen = ['results'].includes(screen)
+  const utilityScreen = ['history', 'community', 'network'].includes(screen)
   return <div className="app-frame">
-    {screen !== 'scanning' && screen !== 'gauge' && screen !== 'reveal' && <Navbar active={resultScreen ? 'scan' : 'home'} onNavigate={(target) => target === 'scan' || target === 'home' ? resetToHome() : undefined} onNewScan={resetToHome} />}
-      {screen === 'results' && <div className="detail-nav">{[['overview', 'OVERVIEW'], ['technical', 'TECHNICAL'], ['domain', 'DOMAIN'], ['brand', 'BRAND & TYPOSQUATTING'], ['lexical', 'LEXICAL ANALYSIS'], ['ml', 'MACHINE LEARNING'], ['explainability', 'AI EXPLANATION'], ['reputation', 'REPUTATION'], ['ai-insight', 'AI INSIGHT'], ['ask', 'ASK TRUSTSHIELD'], ['content', 'WEBSITE CONTENT'], ['positive', 'POSITIVE SIGNALS'], ['warning', 'WARNING SIGNALS'], ['raw', 'RAW DETAILS']].map(([id, label]) => <button key={id} className={activeTab === id ? 'detail-tab active' : 'detail-tab'} onClick={() => setActiveTab(id)}>{label}</button>)}</div>}
+    {screen !== 'scanning' && screen !== 'gauge' && screen !== 'reveal' && <Navbar active={resultScreen ? 'scan' : utilityScreen ? 'history' : 'home'} onNavigate={(target) => target === 'scan' || target === 'home' ? resetToHome() : target === 'history' ? setScreen('history') : undefined} onNewScan={resetToHome} />}
     <AnimatePresence mode="wait">
       {screen === 'home' && <PageTransition key="home"><HomePage url={url} setUrl={setUrl} onSubmit={handleScan} error={error} /></PageTransition>}
       {screen === 'scanning' && <PageTransition key="scanning"><ScanningPage url={activeUrl} /></PageTransition>}
       {screen === 'gauge' && result && <PageTransition key="gauge"><TrustGauge score={result.trustshield_score} onComplete={() => setScreen('reveal')} /></PageTransition>}
       {screen === 'reveal' && result && <PageTransition key="reveal"><ScoreReveal result={result} onView={() => setScreen('results')} /></PageTransition>}
-      {screen === 'results' && result && <PageTransition key={activeTab}>{renderResults()}</PageTransition>}
+      {screen === 'results' && result && <div className="analysis-layout"><AnalysisSidebar activeTab={activeTab} result={result} onSelect={navigateAnalysis} onNewScan={resetToHome} /><main className="analysis-main"><PageTransition key={activeTab}>{renderResults()}</PageTransition></main></div>}
+      {screen === 'history' && <HistoryPage onScanAgain={resetToHome} onViewResult={openHistoryResult} />}
+      {screen === 'community' && <CommunityPage result={result} onScanAgain={resetToHome} onBack={() => setScreen(result ? 'results' : 'home')} />}
+      {screen === 'network' && <NetworkPage result={result} onBack={() => setScreen(result ? 'results' : 'home')} onScanAgain={resetToHome} />}
       {screen === 'error' && <PageTransition key="error"><main className="error-screen"><p className="eyebrow">Scan interrupted</p><h1>Analysis Failed</h1><p>We could not complete the website scan.</p><div className="error-detail">{error}</div><div className="error-actions"><button className="primary-button" onClick={() => { setError(''); setScreen('home') }}>TRY AGAIN</button><button className="outline-button" onClick={resetToHome}>ENTER ANOTHER URL</button></div></main></PageTransition>}
     </AnimatePresence>
   </div>
 }
 
 export default App
+
+
+
+
